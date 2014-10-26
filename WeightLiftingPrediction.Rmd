@@ -1,0 +1,75 @@
+---
+title: "Weight Lifting prediction"
+author: "Pamela Chua"
+date: "26 October, 2014"
+output: html_document
+---
+
+In this prediction exercise, we used the dataset collected using devices such as Jawbone Up, Nike FuelBand and Fitbit to predict the manner in which the subjects did the weight lifting exercise. In order to build the model, we first needed to understand the data and conduct exploratory data analysis, which led us to preprocess the data into a more tidy data frame.
+
+In terms of the model chosen, we picked random forests as the algorithm is usually one of the top few peformers. The cross validation conducted on 30% of the training data has proved to be the case, with a high accuracy of 0.9963. We then used this model built using random forests to predict with our test set.
+
+### Loading the data
+```{r,cache=TRUE}
+# Read in the data sets
+train <- read.csv("pml-training.csv", na.strings=c("#DIV/0!", "", " ", "NA"))
+test <- read.csv("pml-testing.csv", na.strings=c("#DIV/0!", "", " ", "NA"))
+```
+
+### Exploratory data analysis
+```{r}
+# Looking and understanding the data variables
+str(train)
+table(train$classe)
+```
+
+We have 160 variables but from the above exploration, it seems that there are a number of variables with NA values. We will remove the columns where most (> 90%) of the observations are NA. Also, we note that the first 7 columns are variables like id number, user name, time stamp, etc which are not relevant to our prediction so we will remove these columns as well.
+
+```{r}
+retainCols <- which(colSums(is.na(train))/nrow(train) <= 0.1)
+train_pp <- train[,retainCols]
+train_pp <- train_pp[,-c(1:7)]
+str(train_pp)
+
+# Do the same for the test set since we are not using the columns for prediction
+test_pp <- test[,retainCols[-60]]
+test_pp <- test_pp[,-c(1:7)]
+```
+
+Now we are left with 52 predictor variables and a more tidy data set to model the prediction.
+
+### Splitting into training and cross-validation sets
+
+We will use 70% of the training set for our training and 30% for cross validation as this is a typical and effective split for training sets.
+
+```{r}
+library(caret)
+set.seed(1)
+inTrain <- createDataPartition(y=train_pp$classe, p=0.7, list=FALSE)
+training <-train_pp[inTrain,]
+crossVal <-train_pp[-inTrain,]
+```
+
+### Model building using Random Forests
+```{r,message=FALSE, cache=TRUE}
+set.seed(1)
+library(randomForest)
+modFit <- randomForest(classe ~ ., data=training)
+
+# Use the model on cross validation
+crossValPredict <- predict(modFit, crossVal[,-60])
+confusionMatrix(crossVal$classe, crossValPredict)
+```
+
+Based on the cross validation, which had accuracy of 0.9963, we estimate our out-of-sample error to be about 0.0037.
+
+### Model prediction using Random Forests
+We now use our model which seems to be highly accurate based on the cross validation on the test set.
+```{r}
+test_pp <- data.frame(test_pp[,-60])
+pred <- predict(modFit, test_pp)
+pred
+```
+
+### Conclusion
+In order to build this prediction model for the weight lifting exercise, we first explored, pre-processed the data, fitted the model, verified using cross validation and finally used our model to predict on our test set. Based on the high accuracy of the cross validation, we estimate the out-of-sample error to be quite low.
